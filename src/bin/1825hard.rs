@@ -1,140 +1,172 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque}; // BTreeMap, VecDeque
 
-struct OrderedSet<T> {
-    tree: BTreeMap<T, i32>,
+struct MultiBTreeSet<T> {
+    // 泛型
+    key2cnt: BTreeMap<T, i32>,
 }
 
-impl<T> OrderedSet<T>
-where
-    T: PartialOrd + Ord + Copy,
+impl<T> MultiBTreeSet<T>
+where 
+    T: PartialOrd + Ord + Copy, // 泛型 类型约束
 {
-    fn new() -> Self {
-        Self {
-            tree: BTreeMap::new(),
-        }
+    pub fn new() -> Self {
+        return Self {
+            key2cnt: BTreeMap::new(),
+        };
     }
 
-    fn insert(&mut self, x: T) {
-        *self.tree.entry(x).or_insert(0) += 1;
+    pub fn insert(&mut self, key: T) {
+        *self.key2cnt.entry(key).or_insert(0) += 1;
     }
 
-    fn remove(&mut self, x: &T) -> bool {
+    pub fn remove(&mut self, key: &T) -> bool {
         let need_remove = {
-            if let Some(t) = self.tree.get_mut(x) {
-                *t -= 1;
-                *t == 0
+            if let Some(count) = self.key2cnt.get_mut(key) {
+                *count -= 1;
+                *count == 0
             } else {
-                return false;
+                return false; // 从函数返回
             }
         };
         if need_remove {
-            self.tree.remove(x);
+            self.key2cnt.remove(key);
         }
         true
     }
 
-    fn peek_first(&mut self) -> &T {
-        self.tree.iter().next().unwrap().0
+    pub fn peek_first(&mut self) -> &T {
+        return self.key2cnt.iter().next().unwrap().0; // iter().next().unwrap().0
     }
 
-    fn peek_last(&mut self) -> &T {
-        self.tree.iter().rev().next().unwrap().0
+    pub fn peek_last(&mut self) -> &T {
+        return self.key2cnt.iter().rev().next().unwrap().0; // rev()
     }
 
-    fn pop_first(&mut self) -> T {
-        let t = *self.peek_first();
-        self.remove(&t);
-        t
+    pub fn pop_first(&mut self) -> T {
+        let x = *self.peek_first();
+        self.remove(&x);
+        return x;
     }
 
-    fn pop_last(&mut self) -> T {
-        let t = *self.peek_last();
-        self.remove(&t);
-        t
+    pub fn pop_last(&mut self) -> T {
+        let x = *self.peek_last();
+        self.remove(&x);
+        return x;
     }
 }
 
 struct MKAverage {
-    m: i32,
-    k: i32,
+    m: usize,
+    k: usize,
+    sum: i32,
     fifo: VecDeque<i32>,
-    s_min: OrderedSet<i32>,
-    s_mid: OrderedSet<i32>,
-    s_max: OrderedSet<i32>,
-    sum: i64,
+    s_min: MultiBTreeSet<i32>,
+    s_mid: MultiBTreeSet<i32>,
+    s_max: MultiBTreeSet<i32>,
 }
 
 impl MKAverage {
     fn new(m: i32, k: i32) -> Self {
-        Self {
-            m,
-            k,
-            fifo: VecDeque::with_capacity(m as usize),
-            s_min: OrderedSet::new(),
-            s_mid: OrderedSet::new(),
-            s_max: OrderedSet::new(),
+        return Self {
+            m: m as usize,
+            k: k as usize,
             sum: 0,
-        }
+            fifo: VecDeque::with_capacity(m as usize),
+            s_min: MultiBTreeSet::new(),
+            s_mid: MultiBTreeSet::new(),
+            s_max: MultiBTreeSet::new(),
+        };
     }
 
     fn add_element(&mut self, num: i32) {
-        if self.fifo.len() < self.m as usize {
-            self.sum += num as i64;
+        self.fifo.push_back(num);
+        if self.fifo.len() <= self.m {
+            self.sum += num;
             self.s_mid.insert(num);
-            self.fifo.push_back(num);
-            if self.fifo.len() == self.m as usize {
+            if self.fifo.len() == self.m {
                 for _ in 0..self.k {
-                    let t = self.s_mid.pop_first();
-                    self.sum -= t as i64;
-                    self.s_min.insert(t);
+                    let x = self.s_mid.pop_first();
+                    self.s_min.insert(x);
+                    self.sum -= x;
                 }
                 for _ in 0..self.k {
-                    let t = self.s_mid.pop_last();
-                    self.sum -= t as i64;
-                    self.s_max.insert(t);
+                    let x = self.s_mid.pop_last();
+                    self.s_max.insert(x);
+                    self.sum -= x;
                 }
             }
             return;
         }
-        let out = self.fifo.pop_front().unwrap();
-        self.fifo.push_back(num);
+
         if num < *self.s_min.peek_last() {
-            let t = self.s_min.pop_last();
+            let x = self.s_min.pop_last();
+            self.s_mid.insert(x);
+            self.sum += x;
             self.s_min.insert(num);
-            self.s_mid.insert(t);
-            self.sum += t as i64;
         } else if num > *self.s_max.peek_first() {
-            let t = self.s_max.pop_first();
+            let x = self.s_max.pop_first();
+            self.s_mid.insert(x);
+            self.sum += x;
             self.s_max.insert(num);
-            self.s_mid.insert(t);
-            self.sum += t as i64;
         } else {
+            self.sum += num;
             self.s_mid.insert(num);
-            self.sum += num as i64;
         }
-        if self.s_mid.remove(&out) {
-            self.sum -= out as i64;
-        } else if self.s_min.remove(&out) {
-            let t = self.s_mid.pop_first();
-            self.sum -= t as i64;
-            self.s_min.insert(t);
+
+        let x = self.fifo.pop_front().unwrap();
+        if self.s_mid.remove(&x) {
+            self.sum -= x;
+        } else if self.s_min.remove(&x) {
+            let y = self.s_mid.pop_first();
+            self.s_min.insert(y);
+            self.sum -= y;
+        } else if self.s_max.remove(&x) {
+            let y = self.s_mid.pop_last();
+            self.s_max.insert(y);
+            self.sum -= y;
         } else {
-            let t = self.s_mid.pop_last();
-            self.sum -= t as i64;
-            self.s_max.insert(t);
+            panic!();
         }
     }
 
     fn calculate_mk_average(&self) -> i32 {
         if self.fifo.len() < self.m as usize {
-            -1
-        } else {
-            (self.sum / (self.m - self.k * 2) as i64) as i32
+            return -1;
         }
+        self.sum / (self.m as i32 - self.k as i32 * 2)
     }
 }
 
-// 作者：934786601
-// 链接：https://leetcode.cn/problems/finding-mk-average/solution/by-934786601-yi15/
-// 来源：力扣（LeetCode）
-// 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+fn test1() {
+    let mut obj = MKAverage::new(3, 1);
+    obj.add_element(3); // current elements are [3]
+    obj.add_element(1); // current elements are [3,1]
+    let x = obj.calculate_mk_average(); // return -1, because m = 3 and only 2 elements exist.
+    println!("{x:?}");
+    obj.add_element(10); // current elements are [3,1,10]
+    let x = obj.calculate_mk_average(); // The last 3 elements are [3,1,10]. // After removing smallest and largest 1 element the container will be [3]. // The average of [3] equals 3/1 = 3, return 3
+    println!("{x:?}");
+    obj.add_element(5); // current elements are [3,1,10,5]
+    obj.add_element(5); // current elements are [3,1,10,5,5]
+    obj.add_element(5); // current elements are [3,1,10,5,5,5]
+    let x = obj.calculate_mk_average(); // The last 3 elements are [5,5,5].
+    println!("{x:?}");
+}
+
+fn test2() {
+    let mut obj = MKAverage::new(6, 1);
+    obj.add_element(3);
+    obj.add_element(1);
+    obj.add_element(12);
+    obj.add_element(5);
+    obj.add_element(3);
+    obj.add_element(4);
+    let x = obj.calculate_mk_average();
+    println!("{x:?}");
+}
+
+fn main() {
+    test1();
+    println!();
+    test2();
+}
